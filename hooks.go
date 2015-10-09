@@ -15,13 +15,33 @@ var (
 	ourProfilesDirectory = ""
 )
 
-type writeProfileFxn func(profilesDir string) error
+type startFxn func(profilesDir string) error
+type stopFxn func()
 
 // StartProfiling starts writing profiles and returns path to the directory where they will be placed
 // if anything goes wrong corresponding error is returned and no profiling is started
 // If writing profiles is in progress, an error will be returned
 func StartProfiling() (profilesDirectory string, err error) {
-	if traceInProgress() {
+	return startProfiling(startWritingTrace, trace.Stop, startCPUProfiling, pprof.StopCPUProfile)
+}
+
+// StopProfiling stops writing all profiles. Before stopping them it tries to write a heap dump
+// to the same folder where other profiles are kept. It returns path to the folder which contains profiling files
+// If profiling is not in progress no error will be returned
+func StopProfiling() (profilesDirectory string, err error) {
+	return stopProfiling(writeHeapProfile, trace.Stop, pprof.StopCPUProfile)
+}
+
+// ToggleProfiling changes state of writing profiles to the opposite
+func ToggleProfiling() (profilesDirectory string, err error) {
+	if profilingInProgress() {
+		return StopProfiling()
+	}
+	return StartProfiling()
+}
+
+func startProfiling(startTrace startFxn, stopTrace stopFxn, startCPU startFxn, stopCPU stopFxn) (profilesDirectory string, err error) {
+	if profilingInProgress() {
 		return "", fmt.Errorf("Cannot start profiling, since it's already started")
 	}
 	profiles, err := ioutil.TempDir("", "profiles")
@@ -31,44 +51,34 @@ func StartProfiling() (profilesDirectory string, err error) {
 	defer func() {
 		// if something is wrong, do cleanup
 		if err != nil {
-			trace.Stop()
-			pprof.StopCPUProfile()
+			stopCPU()
+			stopTrace()
 			ourProfilesDirectory = ""
+			// TODO: log error if any?
 			os.RemoveAll(profiles)
 		}
 	}()
-	if err := startWritingTrace(profiles); err != nil {
+	if err := startTrace(profiles); err != nil {
 		return "", err
 	}
-	if err := startCPUProfiling(profiles); err != nil {
+	if err := startCPU(profiles); err != nil {
 		return "", err
 	}
 	ourProfilesDirectory = profiles
 	return profiles, nil
 }
 
-// StopProfiling stops writing all profiles. Before stopping them it tries to write a heap dump
-// to the same folder where other profiles are kept. It returns path to the folder which contains profiling files
-// If profiling is not in progress no error will be returned
-func StopProfiling() (profilesDirectory string, err error) {
-	if !traceInProgress() {
+func stopProfiling(writeHeap startFxn, stopTrace, stopCPU stopFxn) (profilesDirectory string, err error) {
+	if !profilingInProgress() {
 		return "", nil
 	}
 	defer func() {
 		// stop everything when we are finished with writing heap profile
-		trace.Stop()
-		pprof.StopCPUProfile()
+		stopCPU()
+		stopTrace()
 		ourProfilesDirectory = ""
 	}()
-	return ourProfilesDirectory, writeHeapProfile(ourProfilesDirectory)
-}
-
-// ToggleProfiling changes state of writing profiles to the opposite
-func ToggleProfiling() (profilesDirectory string, err error) {
-	if traceInProgress() {
-		return StopProfiling()
-	}
-	return StartProfiling()
+	return ourProfilesDirectory, writeHeap(ourProfilesDirectory)
 }
 
 func startWritingTrace(profilesDir string) error {
@@ -96,6 +106,6 @@ func startCPUProfiling(profilesDir string) error {
 	return pprof.StartCPUProfile(cpuProfileFile)
 }
 
-func traceInProgress() bool {
+func profilingInProgress() bool {
 	return ourProfilesDirectory != ""
 }
