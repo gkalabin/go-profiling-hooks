@@ -1,4 +1,4 @@
-package goprofhooks
+package goprof
 
 import (
 	"fmt"
