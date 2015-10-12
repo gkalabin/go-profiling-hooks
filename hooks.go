@@ -15,33 +15,39 @@ var (
 	ourProfilesDirectory = ""
 )
 
+// these types used for mocking functions which start/stop profiling
 type startFxn func(profilesDir string) error
 type stopFxn func()
 
+// ProfilingInProgress returns true if we write profiles at the moment
+func ProfilingInProgress() bool {
+	return ourProfilesDirectory != ""
+}
+
 // StartProfiling starts writing profiles and returns path to the directory where they will be placed
 // if anything goes wrong corresponding error is returned and no profiling is started
-// If writing profiles is in progress, an error will be returned
+// If writing profiles is in progress it returns an error
 func StartProfiling() (profilesDirectory string, err error) {
 	return startProfiling(startWritingTrace, trace.Stop, startCPUProfiling, pprof.StopCPUProfile)
 }
 
-// StopProfiling stops writing all profiles. Before stopping them it tries to write a heap dump
-// to the same folder where other profiles are kept. It returns path to the folder which contains profiling files
-// If profiling is not in progress no error will be returned
+// StopProfiling stops writing all profiles. Before stopping it tries to write a heap dump
+// to the same folder where the other profiles are kept. It returns path to the folder which contains profiling files
+// If profiling is not in progress, this method does nothing and returns no error
 func StopProfiling() (profilesDirectory string, err error) {
 	return stopProfiling(writeHeapProfile, trace.Stop, pprof.StopCPUProfile)
 }
 
 // ToggleProfiling changes state of writing profiles to the opposite
 func ToggleProfiling() (profilesDirectory string, err error) {
-	if profilingInProgress() {
+	if ProfilingInProgress() {
 		return StopProfiling()
 	}
 	return StartProfiling()
 }
 
 func startProfiling(startTrace startFxn, stopTrace stopFxn, startCPU startFxn, stopCPU stopFxn) (profilesDirectory string, err error) {
-	if profilingInProgress() {
+	if ProfilingInProgress() {
 		return "", fmt.Errorf("Cannot start profiling, since it's already started")
 	}
 	profiles, err := ioutil.TempDir("", "profiles")
@@ -69,7 +75,7 @@ func startProfiling(startTrace startFxn, stopTrace stopFxn, startCPU startFxn, s
 }
 
 func stopProfiling(writeHeap startFxn, stopTrace, stopCPU stopFxn) (profilesDirectory string, err error) {
-	if !profilingInProgress() {
+	if !ProfilingInProgress() {
 		return "", nil
 	}
 	defer func() {
@@ -104,8 +110,4 @@ func startCPUProfiling(profilesDir string) error {
 		return err
 	}
 	return pprof.StartCPUProfile(cpuProfileFile)
-}
-
-func profilingInProgress() bool {
-	return ourProfilesDirectory != ""
 }

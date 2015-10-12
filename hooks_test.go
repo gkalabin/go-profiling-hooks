@@ -46,7 +46,7 @@ func TestStartTraceFailed(t *testing.T) {
 	if dir != "" || err == nil {
 		t.Fatalf("Start profiling should return error and no dir. I got '%s' and %v", dir, err)
 	}
-	if profilingInProgress() {
+	if ProfilingInProgress() {
 		t.Fatalf("Profiling is running")
 	}
 	if !stopTrace.called || !stopCPU.called {
@@ -64,7 +64,7 @@ func TestStartCPUFailed(t *testing.T) {
 	if dir != "" || err == nil {
 		t.Fatalf("Start profiling should return error and no dir. I got '%s' and %v", dir, err)
 	}
-	if profilingInProgress() {
+	if ProfilingInProgress() {
 		t.Fatalf("Profiling is running")
 	}
 	if !stopTrace.called || !stopCPU.called {
@@ -92,7 +92,7 @@ func TestStopFailedToDumpHeap(t *testing.T) {
 	if !stopTrace.called || !stopCPU.called {
 		t.Fatalf("Profiles was not stopped")
 	}
-	if profilingInProgress() {
+	if ProfilingInProgress() {
 		t.Fatalf("Profiling is running")
 	}
 	os.RemoveAll(startDir)
@@ -115,7 +115,7 @@ func TestStopCallsStop(t *testing.T) {
 	if !stopTrace.called || !stopCPU.called {
 		t.Fatalf("Profiles was not stopped")
 	}
-	if profilingInProgress() {
+	if ProfilingInProgress() {
 		t.Fatalf("Profiling is running")
 	}
 	os.RemoveAll(startDir)
