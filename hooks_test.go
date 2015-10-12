@@ -27,9 +27,15 @@ func (m *mockStarter) fxn(result error) startFxn {
 	}
 }
 
+func TestMain(m *testing.M) {
+	noLogging := func(format string, args ...interface{}) {}
+	SetLogFunction(noLogging)
+	os.Exit(m.Run())
+}
+
 func TestStopWhenNotRunning(t *testing.T) {
-	if path, err := StopProfiling(); path != "" || err != nil {
-		t.Fatalf("Expected empty string and no error when stopping not running profiling. Got '%s' and %v", path, err)
+	if path := StopProfiling(); path != "" {
+		t.Fatalf("Expected empty string when stopping not running profiling. Got '%s'", path)
 	}
 }
 
@@ -82,10 +88,7 @@ func TestStopFailedToDumpHeap(t *testing.T) {
 	}
 	writeHeap := &mockStarter{}
 	stopTrace, stopCPU := &mockStopper{}, &mockStopper{}
-	stopDir, stopErr := stopProfiling(writeHeap.fxn(fmt.Errorf("test")), stopTrace.fxn(), stopCPU.fxn())
-	if stopErr == nil {
-		t.Fatalf("Expected error from stopProfiling, got nothing")
-	}
+	stopDir := stopProfiling(writeHeap.fxn(fmt.Errorf("test")), stopTrace.fxn(), stopCPU.fxn())
 	if stopDir != startDir {
 		t.Fatalf("Different dirs for start and stop: '%s' and '%s'", startDir, stopDir)
 	}
@@ -105,10 +108,7 @@ func TestStopCallsStop(t *testing.T) {
 	}
 	writeHeap := &mockStarter{}
 	stopTrace, stopCPU := &mockStopper{}, &mockStopper{}
-	stopDir, stopErr := stopProfiling(writeHeap.fxn(nil), stopTrace.fxn(), stopCPU.fxn())
-	if stopErr != nil {
-		t.Fatalf("Got an error: %v", stopErr)
-	}
+	stopDir := stopProfiling(writeHeap.fxn(nil), stopTrace.fxn(), stopCPU.fxn())
 	if stopDir != startDir {
 		t.Fatalf("Different dirs for start and stop: '%s' and '%s'", startDir, stopDir)
 	}

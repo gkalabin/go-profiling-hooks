@@ -28,20 +28,28 @@ func ProfilingInProgress() bool {
 // if anything goes wrong corresponding error is returned and no profiling is started
 // If writing profiles is in progress it returns an error
 func StartProfiling() (profilesDirectory string, err error) {
-	return startProfiling(startWritingTrace, trace.Stop, startCPUProfiling, pprof.StopCPUProfile)
+	dir, err := startProfiling(startWritingTrace, trace.Stop, startCPUProfiling, pprof.StopCPUProfile)
+	if err != nil {
+		logf("Failed to start writing profiles: %v", err)
+	} else {
+		logf("Start writing profiles to '%s'", dir)
+	}
+	return dir, err
 }
 
 // StopProfiling stops writing all profiles. Before stopping it tries to write a heap dump
 // to the same folder where the other profiles are kept. It returns path to the folder which contains profiling files
-// If profiling is not in progress, this method does nothing and returns no error
-func StopProfiling() (profilesDirectory string, err error) {
-	return stopProfiling(writeHeapProfile, trace.Stop, pprof.StopCPUProfile)
+// If profiling is not in progress, this method does nothing and returns empty string
+func StopProfiling() (profilesDirectory string) {
+	dir := stopProfiling(writeHeapProfile, trace.Stop, pprof.StopCPUProfile)
+	logf("Stop writing profiles to '%s'", dir)
+	return dir
 }
 
 // ToggleProfiling changes state of writing profiles to the opposite
 func ToggleProfiling() (profilesDirectory string, err error) {
 	if ProfilingInProgress() {
-		return StopProfiling()
+		return StopProfiling(), nil
 	}
 	return StartProfiling()
 }
@@ -74,9 +82,9 @@ func startProfiling(startTrace startFxn, stopTrace stopFxn, startCPU startFxn, s
 	return profiles, nil
 }
 
-func stopProfiling(writeHeap startFxn, stopTrace, stopCPU stopFxn) (profilesDirectory string, err error) {
+func stopProfiling(writeHeap startFxn, stopTrace, stopCPU stopFxn) (profilesDirectory string) {
 	if !ProfilingInProgress() {
-		return "", nil
+		return ""
 	}
 	defer func() {
 		// stop everything when we are finished with writing heap profile
@@ -84,7 +92,10 @@ func stopProfiling(writeHeap startFxn, stopTrace, stopCPU stopFxn) (profilesDire
 		stopTrace()
 		ourProfilesDirectory = ""
 	}()
-	return ourProfilesDirectory, writeHeap(ourProfilesDirectory)
+	if err := writeHeap(ourProfilesDirectory); err != nil {
+		logf("Failed to write heap profile: %v", err)
+	}
+	return ourProfilesDirectory
 }
 
 func startWritingTrace(profilesDir string) error {
